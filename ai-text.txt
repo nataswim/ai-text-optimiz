@@ -1,0 +1,708 @@
+<?php
+/*
+Plugin Name: AI Text Optimizer
+Description: Ajoute un bouton IA à l'éditeur classique et WPBakery pour corriger, enrichir et optimiser le texte avec ChatGPT.
+Version: 2.0
+Author: Hassan  EL HAOUAT MyCreaNet
+Text Domain: ai-text
+*/
+
+// Sécurité : Empêcher l'accès direct
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Constantes du plugin
+define('AI_TEXT_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('AI_TEXT_PLUGIN_PATH', plugin_dir_path(__FILE__));
+define('AI_TEXT_VERSION', '2.1');
+
+// Activation du plugin
+register_activation_hook(__FILE__, 'ai_text_activation');
+function ai_text_activation() {
+    add_option('ai_text_api_provider', 'gemini'); // Défaut : Google Gemini (gratuit)
+    add_option('ai_text_api_key', '');
+    add_option('ai_text_model', 'gemini-1.5-flash'); // Nouveau modèle par défaut
+    add_option('ai_text_temperature', 0.7);
+    add_option('ai_text_max_tokens', 1024);
+}
+
+// Désactivation du plugin
+register_deactivation_hook(__FILE__, 'ai_text_deactivation');
+function ai_text_deactivation() {
+    // Nettoyage si nécessaire
+}
+
+// Initialisation du plugin
+add_action('init', 'ai_text_init');
+function ai_text_init() {
+    load_plugin_textdomain('ai-text', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+
+// Enregistrement des scripts et styles
+add_action('admin_enqueue_scripts', 'ai_text_enqueue_scripts');
+function ai_text_enqueue_scripts($hook) {
+    if (in_array($hook, array('post.php', 'post-new.php'))) {
+        wp_enqueue_script(
+            'ai-text-js',
+            AI_TEXT_PLUGIN_URL . 'ai-text-tinymce.js',
+            array('jquery'),
+            AI_TEXT_VERSION,
+            true
+        );
+
+        wp_localize_script('ai-text-js', 'aiTextVars', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('ai_text_nonce'),
+            'strings' => array(
+                'select_text' => __('Sélectionnez le texte à optimiser.', 'ai-text'),
+                'processing' => __('Traitement en cours...', 'ai-text'),
+                'error' => __('Erreur lors du traitement.', 'ai-text'),
+                'no_response' => __('Aucune réponse de l\'IA.', 'ai-text'),
+                'connection_error' => __('Erreur de connexion.', 'ai-text')
+            )
+        ));
+    }
+    
+    // Styles pour l'interface admin
+    if ($hook === 'settings_page_ai-text-settings') {
+        wp_enqueue_style(
+            'ai-text-admin-css',
+            AI_TEXT_PLUGIN_URL . 'ai-text-admin.css',
+            array(),
+            AI_TEXT_VERSION
+        );
+    }
+}
+
+// Ajout du menu d'administration
+add_action('admin_menu', 'ai_text_admin_menu');
+function ai_text_admin_menu() {
+    add_options_page(
+        __('AI Text Optimizer', 'ai-text'),
+        __('AI Text', 'ai-text'),
+        'manage_options',
+        'ai-text-settings',
+        'ai_text_admin_page'
+    );
+}
+
+// Page d'administration
+function ai_text_admin_page() {
+    if (isset($_POST['submit'])) {
+        check_admin_referer('ai_text_admin_nonce');
+        
+        update_option('ai_text_api_provider', sanitize_text_field($_POST['api_provider']));
+        update_option('ai_text_api_key', sanitize_text_field($_POST['api_key']));
+        update_option('ai_text_model', sanitize_text_field($_POST['model']));
+        update_option('ai_text_temperature', floatval($_POST['temperature']));
+        update_option('ai_text_max_tokens', intval($_POST['max_tokens']));
+        update_option('ai_text_search_api_key', sanitize_text_field($_POST['search_api_key']));
+        update_option('ai_text_search_engine_id', sanitize_text_field($_POST['search_engine_id']));
+        
+        echo '<div class="notice notice-success"><p>' . __('Paramètres sauvegardés !', 'ai-text') . '</p></div>';
+    }
+    
+    $api_provider = get_option('ai_text_api_provider', 'gemini');
+    $api_key = get_option('ai_text_api_key', '');
+    $model = get_option('ai_text_model', 'gemini-1.5-flash'); // Nouveau modèle par défaut
+    $temperature = get_option('ai_text_temperature', 0.7);
+    $max_tokens = get_option('ai_text_max_tokens', 1024);
+    $search_api_key = get_option('ai_text_search_api_key', '');
+    $search_engine_id = get_option('ai_text_search_engine_id', '');
+    ?>
+    
+    <div class="wrap ai-text-admin">
+        <h1><?php _e('AI Text Optimizer - Configuration', 'ai-text'); ?></h1>
+        
+        <div class="ai-text-admin-content">
+            <form method="post" action="">
+                <?php wp_nonce_field('ai_text_admin_nonce'); ?>
+                
+                <div class="ai-text-section">
+                    <h2><?php _e('Configuration de l\'API IA', 'ai-text'); ?></h2>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">
+                                <label for="api_provider"><?php _e('Fournisseur d\'API', 'ai-text'); ?></label>
+                            </th>
+                            <td>
+                                <select id="api_provider" name="api_provider" onchange="updateModelOptions()">
+                                    <option value="gemini" <?php selected($api_provider, 'gemini'); ?>>🆓 Google Gemini (Gratuit)</option>
+                                    <option value="groq" <?php selected($api_provider, 'groq'); ?>>⚡ Groq (Gratuit + Rapide)</option>
+                                    <option value="huggingface" <?php selected($api_provider, 'huggingface'); ?>>🤗 Hugging Face (Gratuit)</option>
+                                    <option value="cohere" <?php selected($api_provider, 'cohere'); ?>>📝 Cohere (Gratuit)</option>
+                                    <option value="openai" <?php selected($api_provider, 'openai'); ?>>💰 OpenAI (Payant)</option>
+                                </select>
+                                <p class="description"><?php _e('Choisissez votre fournisseur d\'IA préféré', 'ai-text'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row">
+                                <label for="api_key"><?php _e('Clé API', 'ai-text'); ?></label>
+                            </th>
+                            <td>
+                                <input type="password" id="api_key" name="api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" required />
+                                <div id="api_instructions">
+                                    <p class="description" id="gemini_instructions" style="<?php echo $api_provider === 'gemini' ? '' : 'display:none'; ?>">
+                                        🆓 <strong>Google Gemini (Gratuit) :</strong> <a href="https://makersuite.google.com/app/apikey" target="_blank">Obtenir une clé API gratuite</a>
+                                    </p>
+                                    <p class="description" id="groq_instructions" style="<?php echo $api_provider === 'groq' ? '' : 'display:none'; ?>">
+                                        ⚡ <strong>Groq (Gratuit + Rapide) :</strong> <a href="https://console.groq.com/keys" target="_blank">Obtenir une clé API gratuite</a>
+                                    </p>
+                                    <p class="description" id="huggingface_instructions" style="<?php echo $api_provider === 'huggingface' ? '' : 'display:none'; ?>">
+                                        🤗 <strong>Hugging Face (Gratuit) :</strong> <a href="https://huggingface.co/settings/tokens" target="_blank">Obtenir un token gratuit</a>
+                                    </p>
+                                    <p class="description" id="cohere_instructions" style="<?php echo $api_provider === 'cohere' ? '' : 'display:none'; ?>">
+                                        📝 <strong>Cohere (Gratuit) :</strong> <a href="https://dashboard.cohere.ai/api-keys" target="_blank">Obtenir une clé API gratuite</a>
+                                    </p>
+                                    <p class="description" id="openai_instructions" style="<?php echo $api_provider === 'openai' ? '' : 'display:none'; ?>">
+                                        💰 <strong>OpenAI (Payant) :</strong> <a href="https://platform.openai.com/api-keys" target="_blank">Obtenir une clé API</a>
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row">
+                                <label for="model"><?php _e('Modèle IA', 'ai-text'); ?></label>
+                            </th>
+                            <td>
+                                <select id="model" name="model">
+                                    <!-- Options seront remplies par JavaScript -->
+                                </select>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row">
+                                <label for="temperature"><?php _e('Température', 'ai-text'); ?></label>
+                            </th>
+                            <td>
+                                <input type="number" id="temperature" name="temperature" value="<?php echo esc_attr($temperature); ?>" min="0" max="1" step="0.1" />
+                                <p class="description"><?php _e('Contrôle la créativité (0 = conservateur, 1 = créatif)', 'ai-text'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row">
+                                <label for="max_tokens"><?php _e('Tokens maximum', 'ai-text'); ?></label>
+                            </th>
+                            <td>
+                                <input type="number" id="max_tokens" name="max_tokens" value="<?php echo esc_attr($max_tokens); ?>" min="100" max="4096" />
+                                <p class="description"><?php _e('Longueur maximale de la réponse', 'ai-text'); ?></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="ai-text-section">
+                    <h2><?php _e('Configuration Recherche Web (Optionnel)', 'ai-text'); ?></h2>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">
+                                <label for="search_api_key"><?php _e('Clé API Google Custom Search', 'ai-text'); ?></label>
+                            </th>
+                            <td>
+                                <input type="text" id="search_api_key" name="search_api_key" value="<?php echo esc_attr($search_api_key); ?>" class="regular-text" />
+                                <p class="description"><?php _e('Pour la recherche web automatique', 'ai-text'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row">
+                                <label for="search_engine_id"><?php _e('ID du moteur de recherche', 'ai-text'); ?></label>
+                            </th>
+                            <td>
+                                <input type="text" id="search_engine_id" name="search_engine_id" value="<?php echo esc_attr($search_engine_id); ?>" class="regular-text" />
+                                <p class="description"><?php _e('ID du Custom Search Engine', 'ai-text'); ?></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <?php submit_button(); ?>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+    function updateModelOptions() {
+        const provider = document.getElementById('api_provider').value;
+        const modelSelect = document.getElementById('model');
+        const currentModel = '<?php echo esc_js($model); ?>';
+        
+        // Cacher toutes les instructions
+        document.querySelectorAll('#api_instructions p').forEach(p => p.style.display = 'none');
+        
+        // Afficher les instructions du provider sélectionné
+        const instruction = document.getElementById(provider + '_instructions');
+        if (instruction) instruction.style.display = 'block';
+        
+        // Modèles disponibles par provider
+        const models = {
+            gemini: [
+                {value: 'gemini-1.5-flash', text: 'Gemini 1.5 Flash (Recommandé)'},
+                {value: 'gemini-1.5-pro', text: 'Gemini 1.5 Pro (Plus intelligent)'},
+                {value: 'gemini-1.0-pro', text: 'Gemini 1.0 Pro'}
+            ],
+            groq: [
+                {value: 'llama3-8b-8192', text: 'Llama 3 8B (Rapide)'},
+                {value: 'llama3-70b-8192', text: 'Llama 3 70B (Plus intelligent)'},
+                {value: 'mixtral-8x7b-32768', text: 'Mixtral 8x7B'},
+                {value: 'gemma-7b-it', text: 'Gemma 7B'}
+            ],
+            huggingface: [
+                {value: 'microsoft/DialoGPT-medium', text: 'DialoGPT Medium'},
+                {value: 'microsoft/DialoGPT-large', text: 'DialoGPT Large'},
+                {value: 'facebook/blenderbot-400M-distill', text: 'BlenderBot 400M'}
+            ],
+            cohere: [
+                {value: 'command', text: 'Command (Recommandé)'},
+                {value: 'command-light', text: 'Command Light (Plus rapide)'}
+            ],
+            openai: [
+                {value: 'gpt-3.5-turbo', text: 'GPT-3.5 Turbo (Recommandé)'},
+                {value: 'gpt-4', text: 'GPT-4'},
+                {value: 'gpt-4-turbo', text: 'GPT-4 Turbo'}
+            ]
+        };
+        
+        // Vider et remplir les options
+        modelSelect.innerHTML = '';
+        models[provider].forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.value;
+            option.textContent = model.text;
+            option.selected = model.value === currentModel;
+            modelSelect.appendChild(option);
+        });
+    }
+    
+    // Initialiser au chargement
+    document.addEventListener('DOMContentLoaded', updateModelOptions);
+    </script>
+    <?php
+}
+
+// Traitement AJAX principal
+add_action('wp_ajax_ai_text_process', 'ai_text_process_text');
+function ai_text_process_text() {
+    // Debug temporaire
+    error_log('AI Text Debug: Fonction appelée');
+    
+    check_ajax_referer('ai_text_nonce', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error(__('Permissions insuffisantes.', 'ai-text'));
+    }
+    
+    $api_key = get_option('ai_text_api_key');
+    if (empty($api_key)) {
+        wp_send_json_error(__('Clé API non configurée. Allez dans Réglages > AI Text pour la configurer.', 'ai-text'));
+    }
+    
+    $title = sanitize_text_field($_POST['title'] ?? '');
+    $content = wp_kses_post($_POST['content'] ?? '');
+    $action_type = sanitize_text_field($_POST['action_type'] ?? 'optimize');
+    
+    // Debug
+    error_log('AI Text Debug: title=' . $title . ', action=' . $action_type . ', content_length=' . strlen($content));
+    
+    $web_data = '';
+    if ($action_type === 'create_content') {
+        $web_data = ai_text_search_web($content);
+    }
+    
+    $prompt = ai_text_build_prompt($title, $content, $action_type, $web_data);
+    
+    $response = ai_text_call_ai($prompt); // Utilisation de la nouvelle fonction multi-API
+    
+    if (is_wp_error($response)) {
+        error_log('AI Text Debug Error: ' . $response->get_error_message());
+        wp_send_json_error($response->get_error_message());
+    }
+    
+    error_log('AI Text Debug: Succès');
+    wp_send_json_success($response);
+}
+
+// Test AJAX simple
+add_action('wp_ajax_ai_text_test', 'ai_text_test');
+function ai_text_test() {
+    wp_send_json_success('Test AJAX fonctionne !');
+}
+
+// Test API multi-provider
+add_action('wp_ajax_ai_text_test_api', 'ai_text_test_api');
+function ai_text_test_api() {
+    $api_provider = get_option('ai_text_api_provider', 'gemini');
+    $api_key = get_option('ai_text_api_key');
+    
+    if (empty($api_key)) {
+        wp_send_json_error('Clé API non configurée');
+    }
+    
+    // Test simple
+    $test_prompt = 'Dis bonjour en français en une phrase.';
+    $response = ai_text_call_ai($test_prompt);
+    
+    if (is_wp_error($response)) {
+        wp_send_json_error('Erreur ' . $api_provider . ': ' . $response->get_error_message());
+    }
+    
+    wp_send_json_success(array(
+        'provider' => $api_provider,
+        'response' => $response,
+        'success' => true
+    ));
+}
+
+// Mode démo (temporaire)
+add_action('wp_ajax_ai_text_demo', 'ai_text_demo');
+function ai_text_demo() {
+    check_ajax_referer('ai_text_nonce', 'nonce');
+    
+    $title = sanitize_text_field($_POST['title'] ?? '');
+    $content = wp_kses_post($_POST['content'] ?? '');
+    $action_type = sanitize_text_field($_POST['action_type'] ?? 'optimize');
+    
+    // Simulation de réponse IA
+    $demo_responses = array(
+        'correct' => "Voici le texte corrigé : \n\n" . $content . "\n\n(Corrections apportées : orthographe et grammaire)",
+        'optimize' => "Titre optimisé : " . $title . "\n\nContenu SEO optimisé : \n\n" . $content . "\n\nMots-clés intégrés et structure améliorée pour le référencement.",
+        'enrich' => $content . "\n\nContenu enrichi avec des détails supplémentaires, des exemples pertinents et des informations complémentaires pour améliorer la valeur du texte.",
+        'create_content' => "<h2>Article généré : " . $title . "</h2>\n\n<p>Introduction captivante basée sur : " . $content . "</p>\n\n<h3>Section principale</h3>\n<p>Développement du sujet avec des informations détaillées...</p>\n\n<h3>Conclusion</h3>\n<p>Synthèse et appel à l'action optimisé SEO.</p>"
+    );
+    
+    $response = $demo_responses[$action_type] ?? $demo_responses['optimize'];
+    
+    wp_send_json_success($response . "\n\n--- MODE DÉMO ACTIVÉ ---");
+}
+
+// Construction du prompt selon le type d'action
+function ai_text_build_prompt($title, $content, $action_type, $web_data = '') {
+    $prompts = array(
+        'optimize' => "Titre : $title\n\nTexte : $content\n\nCorrige les fautes, améliore le style et optimise le SEO. Renvoie uniquement le texte optimisé.",
+        'correct' => "Titre : $title\n\nTexte : $content\n\nCorrige uniquement les fautes d'orthographe, de grammaire et de syntaxe. Renvoie uniquement le texte corrigé.",
+        'enrich' => "Titre : $title\n\nTexte : $content\n\nEnrichis ce texte en ajoutant des détails pertinents, des exemples et des informations complémentaires. Renvoie uniquement le texte enrichi.",
+        'create_content' => "Titre : $title\n\nIdée/Mots-clés : $content\n\nInformations web récentes :\n$web_data\n\nCrée un article complet et optimisé SEO basé sur ces informations. Structure le contenu avec des sous-titres H2 et H3 appropriés."
+    );
+    
+    return $prompts[$action_type] ?? $prompts['optimize'];
+}
+
+// Recherche web pour enrichir le contenu
+function ai_text_search_web($query) {
+    $api_key = get_option('ai_text_search_api_key');
+    $engine_id = get_option('ai_text_search_engine_id');
+    
+    if (empty($api_key) || empty($engine_id)) {
+        return '';
+    }
+    
+    $url = "https://www.googleapis.com/customsearch/v1?key=$api_key&cx=$engine_id&q=" . urlencode($query) . "&num=5";
+    
+    $response = wp_remote_get($url, array('timeout' => 10));
+    
+    if (is_wp_error($response)) {
+        return '';
+    }
+    
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+    
+    if (!isset($data['items'])) {
+        return '';
+    }
+    
+    $web_info = '';
+    foreach ($data['items'] as $item) {
+        $web_info .= "Titre: " . $item['title'] . "\n";
+        $web_info .= "Description: " . $item['snippet'] . "\n";
+        $web_info .= "URL: " . $item['link'] . "\n\n";
+    }
+    
+    return $web_info;
+}
+
+// Appel à l'API IA (multi-provider)
+function ai_text_call_ai($prompt) {
+    $api_provider = get_option('ai_text_api_provider', 'gemini');
+    $api_key = get_option('ai_text_api_key');
+    $model = get_option('ai_text_model', 'gemini-pro');
+    $temperature = get_option('ai_text_temperature', 0.7);
+    $max_tokens = get_option('ai_text_max_tokens', 1024);
+    
+    switch ($api_provider) {
+        case 'gemini':
+            return ai_text_call_gemini($prompt, $api_key, $model, $temperature, $max_tokens);
+        case 'groq':
+            return ai_text_call_groq($prompt, $api_key, $model, $temperature, $max_tokens);
+        case 'huggingface':
+            return ai_text_call_huggingface($prompt, $api_key, $model, $temperature, $max_tokens);
+        case 'cohere':
+            return ai_text_call_cohere($prompt, $api_key, $model, $temperature, $max_tokens);
+        case 'openai':
+            return ai_text_call_openai_old($prompt, $api_key, $model, $temperature, $max_tokens);
+        default:
+            return new WP_Error('api_error', __('Fournisseur d\'API non supporté.', 'ai-text'));
+    }
+}
+
+// Google Gemini API (GRATUIT) - Corrigé
+function ai_text_call_gemini($prompt, $api_key, $model, $temperature, $max_tokens) {
+    // Utiliser la nouvelle API v1 au lieu de v1beta
+    $url = "https://generativelanguage.googleapis.com/v1/models/{$model}:generateContent?key={$api_key}";
+    
+    $body = array(
+        'contents' => array(
+            array(
+                'parts' => array(
+                    array('text' => $prompt)
+                )
+            )
+        ),
+        'generationConfig' => array(
+            'temperature' => floatval($temperature),
+            'maxOutputTokens' => intval($max_tokens)
+        )
+    );
+    
+    $response = wp_remote_post($url, array(
+        'headers' => array(
+            'Content-Type' => 'application/json'
+        ),
+        'body' => json_encode($body),
+        'timeout' => 60
+    ));
+    
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', __('Erreur Gemini: ' . $response->get_error_message(), 'ai-text'));
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $response_body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        $error_data = json_decode($response_body, true);
+        $error_message = 'Code ' . $response_code;
+        if ($error_data && isset($error_data['error']['message'])) {
+            $error_message .= ': ' . $error_data['error']['message'];
+        }
+        return new WP_Error('api_error', __('Erreur Gemini: ' . $error_message, 'ai-text'));
+    }
+    
+    $body = json_decode($response_body, true);
+    
+    if (!isset($body['candidates'][0]['content']['parts'][0]['text'])) {
+        return new WP_Error('api_error', __('Réponse Gemini invalide.', 'ai-text'));
+    }
+    
+    return $body['candidates'][0]['content']['parts'][0]['text'];
+}
+
+// Groq API (GRATUIT + RAPIDE)
+function ai_text_call_groq($prompt, $api_key, $model, $temperature, $max_tokens) {
+    $body = array(
+        'model' => $model,
+        'messages' => array(
+            array(
+                'role' => 'system',
+                'content' => 'Tu es un rédacteur SEO professionnel et expert en création de contenu web français.'
+            ),
+            array(
+                'role' => 'user',
+                'content' => $prompt
+            )
+        ),
+        'temperature' => floatval($temperature),
+        'max_tokens' => intval($max_tokens)
+    );
+    
+    $response = wp_remote_post('https://api.groq.com/openai/v1/chat/completions', array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key
+        ),
+        'body' => json_encode($body),
+        'timeout' => 60
+    ));
+    
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', __('Erreur Groq: ' . $response->get_error_message(), 'ai-text'));
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $response_body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        $error_data = json_decode($response_body, true);
+        $error_message = 'Code ' . $response_code;
+        if ($error_data && isset($error_data['error']['message'])) {
+            $error_message .= ': ' . $error_data['error']['message'];
+        }
+        return new WP_Error('api_error', __('Erreur Groq: ' . $error_message, 'ai-text'));
+    }
+    
+    $body = json_decode($response_body, true);
+    
+    if (!isset($body['choices'][0]['message']['content'])) {
+        return new WP_Error('api_error', __('Réponse Groq invalide.', 'ai-text'));
+    }
+    
+    return $body['choices'][0]['message']['content'];
+}
+
+// Hugging Face API (GRATUIT)
+function ai_text_call_huggingface($prompt, $api_key, $model, $temperature, $max_tokens) {
+    $url = "https://api-inference.huggingface.co/models/{$model}";
+    
+    $body = array(
+        'inputs' => $prompt,
+        'parameters' => array(
+            'temperature' => floatval($temperature),
+            'max_new_tokens' => intval($max_tokens),
+            'return_full_text' => false
+        )
+    );
+    
+    $response = wp_remote_post($url, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key
+        ),
+        'body' => json_encode($body),
+        'timeout' => 60
+    ));
+    
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', __('Erreur Hugging Face: ' . $response->get_error_message(), 'ai-text'));
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $response_body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        $error_data = json_decode($response_body, true);
+        $error_message = 'Code ' . $response_code;
+        if ($error_data && isset($error_data['error'])) {
+            $error_message .= ': ' . $error_data['error'];
+        }
+        return new WP_Error('api_error', __('Erreur Hugging Face: ' . $error_message, 'ai-text'));
+    }
+    
+    $body = json_decode($response_body, true);
+    
+    if (!isset($body[0]['generated_text'])) {
+        return new WP_Error('api_error', __('Réponse Hugging Face invalide.', 'ai-text'));
+    }
+    
+    return $body[0]['generated_text'];
+}
+
+// Cohere API (GRATUIT)
+function ai_text_call_cohere($prompt, $api_key, $model, $temperature, $max_tokens) {
+    $body = array(
+        'model' => $model,
+        'prompt' => $prompt,
+        'temperature' => floatval($temperature),
+        'max_tokens' => intval($max_tokens)
+    );
+    
+    $response = wp_remote_post('https://api.cohere.ai/v1/generate', array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key
+        ),
+        'body' => json_encode($body),
+        'timeout' => 60
+    ));
+    
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', __('Erreur Cohere: ' . $response->get_error_message(), 'ai-text'));
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $response_body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        $error_data = json_decode($response_body, true);
+        $error_message = 'Code ' . $response_code;
+        if ($error_data && isset($error_data['message'])) {
+            $error_message .= ': ' . $error_data['message'];
+        }
+        return new WP_Error('api_error', __('Erreur Cohere: ' . $error_message, 'ai-text'));
+    }
+    
+    $body = json_decode($response_body, true);
+    
+    if (!isset($body['generations'][0]['text'])) {
+        return new WP_Error('api_error', __('Réponse Cohere invalide.', 'ai-text'));
+    }
+    
+    return $body['generations'][0]['text'];
+}
+
+// OpenAI API (renommée pour éviter les conflits)
+function ai_text_call_openai_old($prompt, $api_key, $model, $temperature, $max_tokens) {
+    $body = array(
+        'model' => $model,
+        'messages' => array(
+            array(
+                'role' => 'system',
+                'content' => 'Tu es un rédacteur SEO professionnel et expert en création de contenu web français.'
+            ),
+            array(
+                'role' => 'user',
+                'content' => $prompt
+            )
+        ),
+        'temperature' => floatval($temperature),
+        'max_tokens' => intval($max_tokens)
+    );
+    
+    $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key
+        ),
+        'body' => json_encode($body),
+        'timeout' => 60
+    ));
+    
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', __('Erreur OpenAI: ' . $response->get_error_message(), 'ai-text'));
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $response_body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        $error_data = json_decode($response_body, true);
+        $error_message = 'Code ' . $response_code;
+        if ($error_data && isset($error_data['error']['message'])) {
+            $error_message .= ': ' . $error_data['error']['message'];
+        }
+        return new WP_Error('api_error', __('Erreur OpenAI: ' . $error_message, 'ai-text'));
+    }
+    
+    $body = json_decode($response_body, true);
+    
+    if (!isset($body['choices'][0]['message']['content'])) {
+        return new WP_Error('api_error', __('Réponse OpenAI invalide.', 'ai-text'));
+    }
+    
+    return $body['choices'][0]['message']['content'];
+}
+
+// Ajout du lien vers les paramètres
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'ai_text_settings_link');
+function ai_text_settings_link($links) {
+    $settings_link = '<a href="' . admin_url('options-general.php?page=ai-text-settings') . '">' . __('Paramètres', 'ai-text') . '</a>';
+    array_unshift($links, $settings_link);
+    return $links;
+}

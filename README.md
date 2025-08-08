@@ -5,6 +5,16 @@ Woo Optimisation SEO Produits
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-Compatible-green.svg)](https://woocommerce.com/)
 [![Licence](https://img.shields.io/badge/Licence-GPL%20v2-orange.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
 
+
+
+
+<a href="https://mycreanet.fr/dashboard/" target="_blank">
+  <img src="https://mycreanet.fr/wp-content/uploads/2021/10/reussir-son-site-web-1400.png" alt="Contact MyCreaNet">
+</a>
+
+
+
+
 Optimisez automatiquement vos **titres**, **URLs** et **descriptions**.  
 Compatible avec tous les thèmes et éditeurs WordPress récents.
 

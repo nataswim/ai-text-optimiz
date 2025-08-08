@@ -1,78 +1,97 @@
-🎉 Plugin WooCommerce IA -  !
-🏷️ Optimisation des TITRES produits
+Woo Optimisation SEO Produits
 
-Bouton "🤖 Optimiser le titre" à côté du champ titre
-IA spécialisée pour créer des titres vendeurs et SEO
-Longueur optimale (50-60 caractères)
-Mots-clés et termes techniques intégrés
+[![Version](https://img.shields.io/badge/version-1.0.9-blue.svg)](https://mycreanet.fr)
+[![WordPress](https://img.shields.io/badge/WordPress-5.0+-blue.svg)](https://wordpress.org/)
+[![WooCommerce](https://img.shields.io/badge/WooCommerce-Compatible-green.svg)](https://woocommerce.com/)
+[![Licence](https://img.shields.io/badge/Licence-GPL%20v2-orange.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
 
-🔗 Optimisation des SLUGS (URLs)
+Optimisez automatiquement vos **titres**, **URLs** et **descriptions**.  
+Compatible avec tous les thèmes et éditeurs WordPress récents.
 
-Bouton "🔗 Optimiser le slug" à côté du permalien
-URLs SEO-friendly automatiques
-Suppression des mots vides
-Format parfait pour Google
+---
 
-📝 Descriptions produits améliorées
+## 🚀 Fonctionnalités principales
 
-Prompts spécialisés e-commerce
-Formatage HTML automatique
-Structure avec H2, H3, listes, etc.
+### Optimisation des TITRES produits
+- Bouton **"Optimiser le titre"** à côté du champ titre.  
+- IA spécialisée pour créer des titres vendeurs et optimisés SEO.  
+- Longueur optimale : **50-60 caractères**.  
+- Intégration automatique de mots-clés et termes techniques.  
 
-🛠️ Installation simple :
+### Optimisation des SLUGS (URLs)
+- Bouton **"Optimiser le slug"** à côté du permalien.  
+- Génération d’URLs SEO-friendly automatiques.  
+- Suppression des mots vides.  
+- Format optimisé pour Google.  
 
-Allez dans Produits → Ajouter nouveau (ou modifier un existant)
-Vous verrez les nouveaux boutons :
+### Descriptions produits améliorées
+- Prompts spécialisés e-commerce.  
+- Formatage HTML automatique.  
+- Structure organisée avec H2, H3, listes, etc.  
 
-"🤖 Optimiser le titre" à côté du titre
-"🔗 Optimiser le slug" à côté du permalien
+---
 
+## 🛠 Installation rapide
 
-Testez avec un produit !
+1. Téléchargez et installez le plugin dans **WordPress → Extensions → Ajouter**.  
+2. Activez le plugin.  
+3. Allez dans **Produits → Ajouter nouveau** (ou modifiez un produit existant).  
+4. Utilisez :
+   - **"Optimiser le titre"** à côté du titre.  
+   - **"Optimiser le slug"** à côté du permalien.  
 
-🔧 Fonctionnalités techniques :
+---
 
-✅ Détection automatique de WooCommerce
-✅ Boutons s'ajoutent automatiquement sur les produits
-✅ API Groq utilisée pour tous les traitements
-✅ Prompts spécialisés e-commerce
-✅ Formatage intelligent des slugs
-✅ Interface admin informative
-✅ CSS intégré pour un design propre
+## 🔧 Fonctionnalités techniques
 
-🎯 Compatibilité :
+- Détection automatique de WooCommerce.  
+- Boutons ajoutés automatiquement sur les fiches produits.  
+- Utilisation de l’API **Groq** pour tous les traitements.  
+- Prompts spécialisés e-commerce.  
+- Formatage intelligent des slugs.  
+- Interface admin claire et informative.  
+- CSS intégré pour un design propre.  
 
-✅ WooCommerce toutes versions récentes
-✅ WordPress 5.0+
-✅ Tous les thèmes WooCommerce
-✅ Éditeurs Classic et Gutenberg
-✅ Page builders (Elementor, etc.)
+---
 
-📱 Interface utilisateur :
-Les boutons apparaissent automatiquement :
+## 🎯 Compatibilité
 
-Page d'édition produit → Boutons IA visibles
-Page normale → Boutons IA masqués
-Design cohérent avec l'interface WordPress
-Notifications en temps réel
+- WooCommerce (toutes versions récentes).  
+- WordPress **5.0+**.  
+- Tous les thèmes WooCommerce.  
+- Éditeurs Classic et Gutenberg.  
+- Page builders (Elementor, etc.).  
 
-🚀 Résultat final :
+---
 
-✅ Optimisation du contenu (descriptions, articles)
-✅ Optimisation des titres WooCommerce
-✅ Optimisation des URLs SEO-friendly
-✅ Formatage HTML automatique
-✅ Compatible avec Groq (gratuit et rapide)
+## 📱 Interface utilisateur
 
-🎉 Installation finale :
+- Boutons visibles uniquement dans la page d’édition produit.  
+- Masqués sur les autres pages.  
+- Design cohérent avec l’interface WordPress.  
+- Notifications en temps réel.  
 
-Sauvegardez les  fichiers 
-Testez sur un produit WooCommerce
-Profitez de votre solution IA e-commerce complète
+---
 
-Votre boutique WooCommerce est maintenant équipée d'une IA dédiée à l'optimisation SEO ! 🛒✨
+## ✅ Résultats obtenus
 
-Installez et testez dès maintenant ! 
+- Optimisation automatique des descriptions produits.  
+- Amélioration des titres WooCommerce.  
+- Génération d’URLs SEO-friendly.  
+- Formatage HTML structuré.  
+- Compatible avec **Groq** (rapide et gratuit).  
 
+---
 
-Hassan EL HAOUAT MYCREANET nataswim SPORTNETSYST🚀
+## 📦 Installation finale
+
+1. Sauvegardez les fichiers du plugin.  
+2. Testez sur un produit WooCommerce.  
+3. Profitez d’une solution IA e-commerce complète.  
+
+---
+
+**Auteur :**  
+[Hassan EL HAOUAT – MYCREANET – nataswim – SPORTNETSYST](https://mycreanet.fr)  
+Licence : [GPL v2](https://www.gnu.org/licenses/gpl-2.0.html)
+

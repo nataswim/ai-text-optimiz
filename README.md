@@ -95,3 +95,6 @@ Compatible avec tous les thèmes et éditeurs WordPress récents.
 [Hassan EL HAOUAT – MYCREANET – nataswim – SPORTNETSYST](https://mycreanet.fr)  
 Licence : [GPL v2](https://www.gnu.org/licenses/gpl-2.0.html)
 
+<a href="https://mycreanet.fr/dashboard/" target="_blank">
+  <img src="https://mycreanet.fr/wp-content/uploads/2025/04/Projets_creations_idees_digitales_agence_mycreanet_18.jpg" alt="Contact MyCreaNet">
+</a>
